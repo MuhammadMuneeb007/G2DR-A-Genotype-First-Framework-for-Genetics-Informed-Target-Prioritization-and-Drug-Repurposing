@@ -1,13 +1,224 @@
 # G2DR: A Genotype-First Framework for Genetics-Informed Target Prioritization and Drug Repurposing
 
-**Muhammad Muneeb & David B. Ascher**  
-School of Chemistry and Molecular Biology, The University of Queensland  
-Computational Biology and Clinical Informatics, Baker Heart and Diabetes Institute
-
-> Published in *Bioinformatics Advances*, 2026  
-> G2DR propagates inherited genetic variation through genetically predicted gene expression, multi-method gene-level testing, pathway enrichment, network context, and multi-source drug–target evidence to prioritize candidate targets and repurposing compounds — **no measured disease transcriptomics required**.
+## Graphical Abstract
+ 
+![Graphical Abstract](GraphicalAbstract.jpg) 
+---
+## What G2DR Does (and Doesn't Do)
+ 
+G2DR is a **modular hypothesis-generation framework**, not a definitive therapeutic predictor. It is designed for genotype-first settings where biobank-scale genotype and phenotype labels are available, but disease-specific transcriptomics are absent or sparse.
+ 
+The framework:
+- Imputes genetically regulated expression across 7 prediction resources (MASHR, JTI, UTMOST, UTMOST2, EpiXcan, TIGAR, FUSION) spanning ~50 GTEx tissues
+- Tests differential expression using 8 statistical methods under stratified cross-validation
+- Ranks genes by a reproducibility-weighted composite score derived exclusively from training and validation data
+- Annotates targets with pathway, network hub, and druggability evidence
+- Maps prioritized genes to compounds via Open Targets, DGIdb, and ChEMBL
+ 
+**Important caveats:** TWAS-style signal can be confounded by linkage disequilibrium and co-regulation. Prioritized genes should be interpreted as genetically supported candidates, not confirmed causal effector genes. Drug mapping does not resolve causal directionality or clinical viability.
 
 ---
+
+## Expression Weight Models
+ 
+| Model | Source | Description | Gene–Tissue Pairs |
+|-------|--------|-------------|-------------------|
+| MASHR | [Zenodo](https://zenodo.org/records/7551845) | Multivariate adaptive shrinkage for cross-population transcriptome prediction | ~686,000 |
+| UTMOST/JTI | [Zenodo](https://zenodo.org/records/3842289) | Joint-tissue imputation framework for TWAS and Mendelian randomization | ~539,000 |
+| EpiXcan | [Synapse](https://www.synapse.org/Synapse:syn52745052) | Transcriptome imputation incorporating epigenomic annotations | ~343,000 |
+| FUSION | [gusevlab.org](http://gusevlab.org/projects/fusion/) | Bayesian and penalized regression models for TWAS | ~265,000 |
+| TIGAR | [GitHub](https://github.com/yanglab-emory/TIGAR) | Bayesian gene expression imputation for complex trait mapping | ~176,000 |
+
+## Key Results
+ 
+### 1. Differential Expression Scale
+ 
+| Metric | Value |
+|--------|-------|
+| Total gene-level tests performed | 172,868,680 |
+| Significant test records (FDR < 0.1, \|log₂FC\| ≥ 0.5) | 96,502 |
+| Unique significant genes | 11,451 |
+| Tested gene universe (U) | 34,355 |
+| Discovery set G_discovery (train ∪ val) | 9,305 |
+| Known migraine genes in G_discovery | 1,189 |
+| Novel candidates in G_discovery | 8,116 |
+ 
+---
+ 
+### 2. Held-Out Test Replication
+ 
+*Positives = test-significant genes (T = 7,141). FE = fold enrichment over random expectation.*
+ 
+| Predicted Set | TP | FP | FN | Precision | Recall | FE | p-value |
+|---|---|---|---|---|---|---|---|
+| G_discovery (train ∪ val) | 4,995 | 4,310 | 2,146 | 0.537 | 0.699 | 2.58 | < 10⁻³⁰⁰ |
+| Top 50 | 39 | 11 | 7,102 | 0.780 | 0.005 | 3.75 | 7.14 × 10⁻¹⁸ |
+| Top 100 | 79 | 21 | 7,062 | 0.790 | 0.011 | 3.80 | 1.55 × 10⁻³⁵ |
+| Top 200 | 156 | 44 | 6,985 | 0.780 | 0.022 | 3.75 | 1.77 × 10⁻⁶⁷ |
+| Top 500 | 347 | 153 | 6,794 | 0.694 | 0.049 | 3.34 | 6.94 × 10⁻¹²³ |
+| Top 1000 | 664 | 336 | 6,477 | 0.664 | 0.093 | 3.19 | 2.30 × 10⁻²²⁰ |
+ 
+**Composite score ranking performance:** ROC-AUC = **0.775**, PR-AUC = **0.475** (2.29× lift over random).
+ 
+---
+ 
+### 3. Enrichment for Curated Migraine Genes
+ 
+| Set | N_pred | k_obs | k_exp | FE | p-value |
+|-----|--------|-------|-------|----|---------|
+| G_discovery | 9,305 | 1,189 | 864.01 | 1.38 | 5.47 × 10⁻⁴⁰ |
+| Top 50 | 50 | 12 | 4.64 | 2.58 | 1.71 × 10⁻³ |
+| Top 100 | 100 | 21 | 9.29 | 2.26 | 2.97 × 10⁻⁴ |
+| Top 200 | 200 | 36 | 18.57 | 1.94 | 8.72 × 10⁻⁵ |
+| Top 500 | 500 | 74 | 46.43 | 1.59 | 4.26 × 10⁻⁵ |
+| Top 1000 | 1,000 | 132 | 92.85 | 1.42 | 2.39 × 10⁻⁵ |
+ 
+---
+ 
+### 4. Top-Tissue and Top-Database Discovery Enrichment (migraine genes)
+ 
+| Component | N_pred | k_obs | k_exp | FE | p_emp |
+|-----------|--------|-------|-------|----|-------|
+| **Databases** | | | | | |
+| MASHR | 187 | 40 | 17.40 | 2.30 | 1×10⁻⁴ |
+| UTMOST/JTI | 104 | 18 | 9.68 | 1.86 | 8×10⁻³ |
+| FUSION | 9,146 | 1,156 | 851.30 | 1.36 | 1×10⁻⁴ |
+| EpiXcan | 34 | 5 | 3.16 | 1.58 | 0.211 |
+| TIGAR | 16 | 2 | 1.49 | 1.34 | 0.448 |
+| **Top Tissues** | | | | | |
+| Brain Amygdala | 312 | 57 | 29.04 | 1.96 | 1×10⁻⁴ |
+| Minor Salivary Gland | 315 | 57 | 29.31 | 1.94 | 1×10⁻⁴ |
+| Whole Blood | 381 | 65 | 35.46 | 1.83 | 1×10⁻⁴ |
+| Adrenal Gland | 399 | 67 | 37.13 | 1.80 | 1×10⁻⁴ |
+| Brain Anterior cingulate | 309 | 51 | 28.76 | 1.77 | 2×10⁻⁴ |
+| **Methods** | | | | | |
+| Weighted Logistic | 9,299 | 1,189 | 865.39 | 1.37 | 1×10⁻⁴ |
+| Bayesian Logistic | 9,264 | 1,184 | 862.13 | 1.37 | 1×10⁻⁴ |
+| Welch t-test | 917 | 115 | 85.34 | 1.35 | 6×10⁻⁴ |
+ 
+---
+ 
+### 5. Drug Candidate Enrichment (Top N = 200 genes; curated reference = 4,824 migraine drugs)
+ 
+| Universe | K | Overlap | Precision@K | FE | p-value |
+|----------|---|---------|-------------|----|---------|
+| ALL drugs (139,597 background) | 20 | 5 | 0.25 | 7.24 | 4.93×10⁻⁴ |
+| ALL drugs | 50 | 20 | 0.40 | 11.58 | — |
+| ALL drugs | 100 | 51 | 0.51 | 14.76 | 4.20×10⁻⁴⁷ |
+| ALL drugs | 500 | 205 | 0.41 | 11.87 | 6.19×10⁻¹⁶¹ |
+| PREDICTED set (3,963 returned) | — | 353 present | AUROC = 0.800 | — | AUPRC = 0.353 |
+ 
+*Expanding to N = 500 genes: 7,981 unique drugs, AUROC = 0.815, AUPRC = 0.331.*
+ 
+---
+ 
+### 6. Tiered Clinical Evidence Benchmark
+ 
+*Tier 1 = migraine-specific approved; Tier 2 = guideline-supported; Tier 3 = established off-label; Tier 4 = broad literature-linked.*
+ 
+| Tier | Top-20 | Top-50 | Top-100 | Precision@100 | FE@100 | Top-200 |
+|------|--------|--------|---------|--------------|--------|---------|
+| Tier 1: Migraine-specific approved | 0 | 0 | **0** | 0.00 | 0.00 | **0** |
+| Tier 2: Guideline-supported | 0 | 1 | 1 | 0.01 | 16.38 | 2 |
+| Tier 3: Established off-label | 1 | 1 | 1 | 0.01 | 50.71 | 2 |
+| Tier 4: Broad literature-linked | 1 | 2 | 2 | 0.02 | 5.58 | 4 |
+ 
+> **Honest note:** No Tier 1 migraine-specific approved therapies (triptans, CGRP agents) were recovered within the Top-200. The pipeline preferentially captures off-label and mechanism-linked compound classes. This reflects database curation bias and the tendency of genetically prioritized programs to map onto shared neurobiological processes rather than disease-specific pharmacological axes.
+ 
+---
+ 
+### 7. Gene Prioritization Component Comparison (Top-200)
+ 
+| Ranking Strategy | Test ROC-AUC | Test PR-AUC | Migraine genes (obs/exp) | FE | Precision |
+|---|---|---|---|---|---|
+| Significance only | 0.5475 | 0.5928 | 25 / 25.56 | 0.98 | 0.125 |
+| Effect only | **0.6748** | **0.6627** | 37 / 25.56 | 1.45 | 0.185 |
+| Discovery score only | 0.5431 | 0.5904 | 36 / 25.56 | 1.41 | 0.180 |
+| Pathway only | 0.5285 | 0.5636 | **66** / 25.56 | **2.58** | **0.330** |
+| Hub only | 0.5201 | 0.5513 | 64 / 25.56 | 2.50 | 0.320 |
+| Druggability only | 0.5107 | 0.5442 | 29 / 25.56 | 1.13 | 0.145 |
+| Direct target evidence | 0.5114 | 0.5428 | 58 / 25.56 | 2.27 | 0.290 |
+| **Integrated** | 0.5457 | 0.5848 | 49 / 25.56 | 1.92 | 0.245 |
+ 
+> Effect-only ranking maximises held-out replication; pathway + hub rankings maximise biological enrichment. The integrated score provides a useful balance for downstream target selection.
+ 
+---
+ 
+### 8. Representative Top Genes
+ 
+| Rank | Gene | Score | Hits | Tissues | DBs | Methods | Direction | Drug links |
+|------|------|-------|------|---------|-----|---------|-----------|-----------|
+| 1 | OSGEP | 0.682 | 230 | 14 | 1 | 3 | Higher in cases | 4 (cisplatin, fluorouracil, …) |
+| 2 | SLC25A41 | 0.674 | 97 | 33 | 2 | 3 | Lower in cases | 0 |
+| 5 | RPUSD3 | 0.605 | 376 | 47 | 3 | 5 | Lower in cases | 0 |
+| 8 | RNASEH2C | 0.573 | 89 | 21 | 1 | 3 | Higher in cases | 0 |
+| 11 | CIB2 | 0.556 | 154 | 26 | 1 | 2 | Lower in cases | 0 (putative migraine) |
+| 13 | C3 | 0.539 | 1 | 1 | 1 | 1 | Higher in cases | 1 (clozapine) |
+| 14 | ATP1A4 | 0.531 | 18 | 3 | 3 | 3 | Higher in cases | 1 (ATP) |
+| 15 | RHD | 0.529 | 250 | 38 | 1 | 3 | Lower in cases | 0 |
+ 
+---
+ 
+### 9. Representative Top Drugs
+ 
+| Rank | Drug | Mapped Gene(s) | Category | Directionality | Known migraine drug |
+|------|------|----------------|----------|---------------|---------------------|
+| 1 | Metformin | NDUFV1, NDUFS6 | Approved / repurposable | **Inconsistent** | Yes |
+| 2 | Voxelotor | HBB | Approved / repurposable | Unclear | No |
+| 9 | Memantine | GRIN2B | Approved / repurposable | Unclear | Yes |
+| 10 | Oleclumab | NT5E | Investigational | **Consistent** | No |
+| 12 | Ezatiostat | GSTP1 | Investigational | **Consistent** | No |
+| 13 | Clozapine | C3, SLC1A1, NT5E, GRIN2B | Approved / repurposable | Unclear | No |
+ 
+---
+ 
+### 10. Directionality of Gene–Drug Pairs
+ 
+| Class | Count | Percentage |
+|-------|-------|-----------|
+| Consistent | 13 | 6.1% |
+| Inconsistent | 23 | 10.7% |
+| Unclear | 178 | 83.2% |
+| **Total** | **214** | **100%** |
+ 
+> Most pairs remain directionally unresolved because drug–target databases lack sufficiently specific mechanism-of-action annotations. This is an important limitation and a direction for future work.
+ 
+---
+## Required Input Files
+ 
+| File | Description |
+|------|-------------|
+| `<phenotype>/Fold_<N>/train_data.{bed,bim,fam}` | PLINK genotype — training |
+| `<phenotype>/Fold_<N>/validation_data.{bed,bim,fam}` | PLINK genotype — validation |
+| `<phenotype>/Fold_<N>/test_data.{bed,bim,fam}` | PLINK genotype — test |
+| `<phenotype>/Fold_<N>/COV_PCA` | Covariates: Sex, PC1–PC10 |
+| `migraine_genes.csv` | Known disease genes (`Gene`, `ensembl_gene_id`) |
+| `migraine_drugs.csv` | Known disease drugs for benchmarking |
+| `AllDiseasesToDrugs/ALL_SOURCES_drug_disease_merged.csv` | Global drug–disease background |
+
+ 
+---
+## Limitations
+ 
+- Migraine cohort is modest (733 participants, 53 cases) and class-imbalanced
+- Framework relies on genetically *predicted* rather than measured transcriptomics
+- No gene survived MR multiple-testing correction (FDR < 0.10) due to limited instrument availability and cohort power
+- Low fold-level gene-ranking overlap (mean pairwise Jaccard: 0.019 at Top-50; 0.045 at Top-200), though performance metrics are stable across folds
+- Drug mapping does not resolve causal directionality; 83.2% of top gene–drug pairs are directionally unclear
+- Migraine-specific approved therapies (triptans, CGRP-axis agents) were not recovered — a key gap for future work
+ 
+---
+
+## Utility Repositories
+ 
+| Tool | Purpose | Link |
+|------|---------|------|
+| PhenotypeToGeneDownloaderR | Download genes linked to phenotypes | [GitHub](https://github.com/MuhammadMuneeb007/PhenotypeToGeneDownloaderR) |
+| GeneMapKit | Gene identifier conversion | [GitHub](https://github.com/MuhammadMuneeb007/GeneMapKit) |
+| DownloadDrugsRelatedToDiseases | Download drugs linked to diseases | [GitHub](https://github.com/MuhammadMuneeb007/DownloadDrugsRelatedToDiseases) |
+| drug-disease-mapping | Comprehensive drug–disease background | [GitHub](https://github.com/MuhammadMuneeb007/drug-disease-mapping) |
+---
+
 
 ## Pipeline Overview
 
